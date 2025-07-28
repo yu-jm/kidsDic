@@ -14,25 +14,28 @@ app.get('/api/translate', async (req, res) => {
         return res.status(400).json({ error: 'A word to search is required.' });
     }
 
-    // --- 여기가 핵심적인 변경사항입니다 ---
-    // Glosbe API 주소를 직접 호출하는 대신, CORS 문제를 우회해주는 공개 프록시를 앞에 붙여줍니다.
+    // --- 여기가 다시 한번 변경된 핵심 부분입니다 ---
     const originalGlosbeUrl = `https://glosbe.com/gapi/translate?from=eng&dest=kor&format=json&phrase=${encodeURIComponent(word)}`;
-    const proxyUrl = `https://cors-anywhere.herokuapp.com/${originalGlosbeUrl}`;
+    
+    // 1. 더 안정적인 allOrigins 프록시 서버를 사용하도록 URL을 변경합니다.
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(originalGlosbeUrl)}`;
 
     try {
-        console.log(`Requesting via proxy for the word: ${word}`);
-        
-        // axios 요청 시, 프록시 서버가 자신을 식별할 수 있도록 Origin 헤더를 추가합니다.
-        const apiResponse = await axios.get(proxyUrl, {
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        });
+        console.log(`Requesting via allOrigins proxy for the word: ${word}`);
+        const apiResponse = await axios.get(proxyUrl);
 
-        res.status(200).json(apiResponse.data);
+        // 2. allOrigins는 응답 데이터를 'contents'라는 필드 안에 JSON 문자열로 담아서 줍니다.
+        //    따라서 먼저 contents를 꺼내고, JSON.parse()를 이용해 실제 객체로 변환해야 합니다.
+        if (apiResponse.data && apiResponse.data.contents) {
+            const actualData = JSON.parse(apiResponse.data.contents);
+            res.status(200).json(actualData);
+        } else {
+            // 비정상적인 응답일 경우 에러 처리
+            throw new Error('Invalid response structure from proxy.');
+        }
 
     } catch (error) {
-        console.error('Error while fetching via proxy:', error.message);
+        console.error('Error while fetching via allOrigins proxy:', error.message);
         res.status(500).json({ error: 'Failed to fetch data from the external dictionary API via proxy.' });
     }
 });
