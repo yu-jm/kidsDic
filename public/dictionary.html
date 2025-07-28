@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학생용 영한사전</title>
+    <style>
+        /* CSS 스타일 코드는 변경 없이 그대로 사용합니다. */
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap');
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f4f7f9; color: #333; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        main { width: 100%; max-width: 800px; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); padding: 30px; box-sizing: border-box; }
+        h1 { text-align: center; color: #2c3e50; margin-top: 0; margin-bottom: 30px; }
+        .search-form { display: flex; gap: 10px; margin-bottom: 30px; }
+        #word-input { flex-grow: 1; padding: 15px; border: 2px solid #dcdfe6; border-radius: 8px; font-size: 16px; transition: border-color 0.3s; }
+        #word-input:focus { outline: none; border-color: #4a90e2; }
+        #search-button { padding: 15px 25px; background-color: #4a90e2; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background-color 0.3s; }
+        #search-button:hover { background-color: #357abd; }
+        #results { margin-top: 20px; }
+        .result-section { margin-bottom: 25px; border-bottom: 1px solid #e0e0e0; padding-bottom: 20px; }
+        .result-section:last-child { border-bottom: none; padding-bottom: 0; }
+        .word-header { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .word-title { font-size: 2.5em; font-weight: bold; color: #000; margin: 0; }
+        .phonetic { font-size: 1.2em; color: #555; }
+        .speak-button { background: none; border: none; cursor: pointer; font-size: 2em; color: #4a90e2; padding: 0; }
+        h3 { font-size: 1.4em; color: #34495e; margin-top: 20px; margin-bottom: 15px; }
+        ul { list-style-type: none; padding-left: 0; }
+        li { background-color: #f8f9fa; border-left: 4px solid #4a90e2; padding: 15px; margin-bottom: 10px; border-radius: 4px; }
+        .example-en { font-weight: bold; }
+        .example-ko { color: #555; margin-top: 5px; font-size: 0.95em; }
+        .message { text-align: center; color: #7f8c8d; font-size: 1.2em; padding: 40px 0; }
+        footer { text-align: center; margin-top: 40px; font-size: 0.9em; color: #95a5a6; }
+        footer a { color: #7f8c8d; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <main>
+        <!-- HTML 구조는 변경 없이 그대로 사용합니다. -->
+        <h1>학생용 영한사전</h1>
+        <form class="search-form" id="search-form">
+            <input type="text" id="word-input" placeholder="영단어를 입력하세요..." autocomplete="off">
+            <button type="submit" id="search-button">검색</button>
+        </form>
+        <div id="results">
+            <p class="message">검색할 단어를 입력하고 '검색' 버튼을 눌러주세요.</p>
+        </div>
+        <footer>
+            <p>Dictionary data provided by <a href="https://glosbe.com/" target="_blank">Glosbe</a>.</p>
+        </footer>
+    </main>
+
+    <script>
+        // 자바스크립트 코드도 변경 없이 그대로 사용합니다.
+        const searchForm = document.getElementById('search-form');
+        const wordInput = document.getElementById('word-input');
+        const resultsDiv = document.getElementById('results');
+
+        searchForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const word = wordInput.value.trim();
+            if (word) {
+                searchWord(word);
+            }
+        });
+
+        async function searchWord(word) {
+            resultsDiv.innerHTML = '<p class="message">검색 중...</p>';
+            const apiUrl = `/api/translate?word=${word}`;
+
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error('API 요청 실패');
+                const data = await response.json();
+                displayResults(data, word);
+            } catch (error) {
+                console.error('데이터 로딩 오류:', error);
+                resultsDiv.innerHTML = '<p class="message">결과를 불러오는 중 오류가 발생했습니다.</p>';
+            }
+        }
+
+        function displayResults(data, word) {
+            resultsDiv.innerHTML = '';
+            if (!data.tuc || data.tuc.length === 0) {
+                resultsDiv.innerHTML = `<p class="message">'${word}'에 대한 검색 결과가 없습니다.</p>`;
+                return;
+            }
+            const wordHeader = document.createElement('div');
+            wordHeader.className = 'result-section word-header';
+            let phonetic = '';
+            if (data.tuc[0] && data.tuc[0].phrase && data.tuc[0].phrase['en-fonipa']) {
+                phonetic = `[${data.tuc[0].phrase['en-fonipa']}]`;
+            }
+            wordHeader.innerHTML = `
+                <h2 class="word-title">${word}</h2>
+                ${phonetic ? `<span class="phonetic">${phonetic}</span>` : ''}
+                <button class="speak-button" onclick="speakText('${word}')">🔊</button>
+            `;
+            resultsDiv.appendChild(wordHeader);
+            const meanings = new Set();
+            const examples = [];
+            data.tuc.forEach(item => {
+                if (item.phrase) meanings.add(item.phrase.text);
+                if (item.meanings) item.meanings.forEach(m => meanings.add(m.text));
+                if (item.examples) examples.push(...item.examples);
+            });
+            if (meanings.size > 0) {
+                const meaningsSection = document.createElement('div');
+                meaningsSection.className = 'result-section';
+                let meaningsHtml = '<h3>뜻</h3><ul>';
+                meanings.forEach(text => { meaningsHtml += `<li>${text}</li>`; });
+                meaningsHtml += '</ul>';
+                meaningsSection.innerHTML = meaningsHtml;
+                resultsDiv.appendChild(meaningsSection);
+            }
+            if (examples.length > 0) {
+                const examplesSection = document.createElement('div');
+                examplesSection.className = 'result-section';
+                let examplesHtml = '<h3>예문</h3><ul>';
+                examples.slice(0, 5).forEach(ex => {
+                    if (ex.first && ex.second) {
+                       examplesHtml += `<li><div class="example-en">${ex.first}</div><div class="example-ko">${ex.second}</div></li>`;
+                    }
+                });
+                examplesHtml += '</ul>';
+                examplesSection.innerHTML = examplesHtml;
+                resultsDiv.appendChild(examplesSection);
+            }
+        }
+
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                window.speechSynthesis.speak(utterance);
+            } else {
+                alert("죄송합니다. 이 브라우저는 음성 듣기를 지원하지 않습니다.");
+            }
+        }
+    </script>
+</body>
+</html>
